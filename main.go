@@ -14,7 +14,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var version string = "1.0.0"
+var version string = "2.0.0"
 
 func goDotEnvVariable(key string) string {
 	// Load .env file.
@@ -66,6 +66,9 @@ func main() {
 // message is created on any channel that the authenticated bot has access to.
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
+	author := m.Author.Username
+	authorID := m.Author.ID
+
 	guildID := m.Message.GuildID
 
 	// Ignore all messages created by the bot itself
@@ -78,8 +81,6 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	content := m.Content
 
 	if strings.Contains(content, "!rpshelp") {
-		// Build help message
-		author := m.Author.Username
 
 		// Title
 		commandHelpTitle := "Looks like you need a hand. Check out my goodies below... \n \n"
@@ -106,8 +107,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	if strings.Contains(content, "!rpssite") {
-		// Build start vote message
-		author := m.Author.Username
+		// Create website message
 		message := "Here ya go " + author + "..." + "\n" + "https://discordbots.dev/"
 
 		// Send start vote message
@@ -118,8 +118,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	if strings.Contains(content, "!rpssupport") {
-		// Build start vote message
-		author := m.Author.Username
+		// Create support message
 		message := "Thanks for thinking of me " + author + " 💖." + "\n" + "https://www.patreon.com/BotVoteTo"
 
 		// Send start vote message
@@ -130,7 +129,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	if strings.Contains(content, "!rpsversion") {
-		// Build start vote message
+		// Create version message
 		message := "VoteBot is currently running version " + version
 
 		// Send start vote message
@@ -142,25 +141,23 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	if strings.Contains(content, "!rps") {
 		// Trim bot command from string to grab User tagged
-		trimmed := strings.TrimPrefix(content, "!rps ")
-		trimmedUser := strings.Trim(trimmed, "<@!>")
+		trimCommand := strings.TrimPrefix(content, "!rps ")
+		targetUserID := strings.Trim(trimCommand, "<@!>")
 
 		// GuildMember(guildID, userID string) (st *Member, err error)
-		targetMember, err := s.GuildMember(guildID, trimmedUser)
+		targetUser, err := s.GuildMember(guildID, targetUserID)
 		if err != nil {
 			fmt.Println(err)
 		}
 
-		// Create memberNickname for target identification in challenge message
-		targetNickname := targetMember.Nick
-		if targetNickname == "" {
-			targetNickname = targetMember.User.Username
+		// Create targetUserNickname for target identification in challenge message
+		targetUserNickname := targetUser.Nick
+		if targetUserNickname == "" {
+			targetUserNickname = targetUser.User.Username
 		}
 
 		// Build start challenge message
-		author := m.Author.Username
-		authorID := m.Author.ID
-		startMessage := author + " is challenging " + targetNickname + " to a game of rock paper scissors... \n \n" + "Accept or decline by reacting below in the next 30 seconds. Only " + targetNickname + "'s reaction will trigger a DM to play."
+		startMessage := author + " is challenging " + targetUserNickname + " to a game of rock paper scissors... \n \n" + "Accept or decline by reacting below in the next 30 seconds. Only " + targetUserNickname + "'s reaction will trigger a DM to play."
 
 		// Send start challenge message
 		challengeMessage, err := s.ChannelMessageSendReply(m.ChannelID, startMessage, m.Reference())
@@ -168,245 +165,238 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			fmt.Println(err)
 		}
 
-		// Add yes reaction to vote message
+		// Add a yes reaction to vote message
 		err = s.MessageReactionAdd(m.ChannelID, challengeMessage.ID, "✔️")
 		if err != nil {
 			fmt.Println(err)
 		}
 
-		// Add no reaction to vote message
+		// Add a no reaction to vote message
 		err = s.MessageReactionAdd(m.ChannelID, challengeMessage.ID, "❌")
 		if err != nil {
 			fmt.Println(err)
 		}
 
-		// challengerMove, targetMove := checksendReactions(s, m, trimmed, trimmedUser, authorID, challengeMessage.ID, author)
+		// BELOW CODE TO NEW FUNC
 
-		// fmt.Println("challengerMove: ", challengerMove)
-		// fmt.Println("targetMove: ", targetMove)
+		// timeout := time.After(30 * time.Second)
+		// ticker := time.Tick(500 * time.Millisecond)
 
-		yes, err2 := s.MessageReactions(m.ChannelID, challengeMessage.ID, "✔️", 100, "", "")
-		if err2 != nil {
-			fmt.Println(err2)
-		}
+		result := checkReactions(s, m, challengeMessage.ID, targetUserID, author, authorID, targetUserNickname)
 
-		// Count no reactions from vote message
-		no, err3 := s.MessageReactions(m.ChannelID, challengeMessage.ID, "❌", 100, "", "")
-		if err3 != nil {
-			fmt.Println(err3)
-		}
-
-		fmt.Println(yes)
-		fmt.Println(no)
-
-		timeout := time.After(30 * time.Second)
-		ticker := time.Tick(500 * time.Millisecond)
-
-		// Keep trying until we're timed out or get a result/error
-		for {
-			select {
-			// Got a timeout! fail with a timeout error
-			case <-timeout:
-				authorID := m.Author.ID
-				authorAt := "<@!" + authorID + ">"
-				timeoutMessage := "Bummer, " + authorAt + ". Challenge period ended without a reaction from " + targetNickname + " 😞"
-				_, err := s.ChannelMessageSendReply(challengeMessage.ID, timeoutMessage, m.Reference())
-				if err != nil {
-					fmt.Println(err)
-				}
-				fmt.Println("Challenge period ended without a reaction from the target ID: ", targetNickname)
-				return
-			// Got a tick, we should check on reactions
-			case <-ticker:
-				yes, err2 = s.MessageReactions(m.ChannelID, challengeMessage.ID, "✔️", 100, "", "")
-				if err2 != nil {
-					fmt.Println(err2)
-				}
-
-				for _, yes := range yes {
-
-					fmt.Printf("Name: %s ID: %s\n", yes.Username, yes.ID)
-
-					if yes.ID == trimmedUser {
-
-						// If accepeted by target return with DM to author and target with reaction options
-						authorChannel, errAuthorChannel := s.UserChannelCreate(authorID)
-						if errAuthorChannel != nil {
-							fmt.Println(errAuthorChannel)
-						}
-
-						// Send request move message to author
-						challengerMessage := "Time to clutch " + author + ". Select your move below."
-						authorChannelMessage, errAuthorChannelMessage := s.ChannelMessageSend(authorChannel.ID, challengerMessage)
-						if errAuthorChannelMessage != nil {
-							fmt.Println(errAuthorChannelMessage)
-						}
-
-						// Add rock reaction to request message
-						err := s.MessageReactionAdd(authorChannel.ID, authorChannelMessage.ID, "⛰️")
-						if err != nil {
-							fmt.Println(err)
-						}
-
-						// Add paper reaction to request message
-						err = s.MessageReactionAdd(authorChannel.ID, authorChannelMessage.ID, "🧻")
-						if err != nil {
-							fmt.Println(err)
-						}
-
-						// Add scissors reaction to request message
-						err = s.MessageReactionAdd(authorChannel.ID, authorChannelMessage.ID, "✂️")
-						if err != nil {
-							fmt.Println(err)
-						}
-
-						// If accepeted by target return with DM to author and target with reaction options
-						targetChannel, errTargetChannel := s.UserChannelCreate(trimmedUser)
-						if errTargetChannel != nil {
-							fmt.Println(err)
-						}
-
-						// Send request move message to author
-						targetMessage := "Time to clutch " + targetNickname + ". Select your move below."
-						targetChannelMessage, errTargetChannelMessage := s.ChannelMessageSend(targetChannel.ID, targetMessage)
-						if errTargetChannelMessage != nil {
-							fmt.Println(err)
-						}
-
-						// Add rock reaction to request message
-						err = s.MessageReactionAdd(targetChannel.ID, targetChannelMessage.ID, "⛰️")
-						if err != nil {
-							fmt.Println(err)
-						}
-
-						// Add paper reaction to request message
-						err = s.MessageReactionAdd(targetChannel.ID, targetChannelMessage.ID, "🧻")
-						if err != nil {
-							fmt.Println(err)
-						}
-
-						// Add scissors reaction to request message
-						err = s.MessageReactionAdd(targetChannel.ID, targetChannelMessage.ID, "✂️")
-						if err != nil {
-							fmt.Println(err)
-						}
-
-						timeout2 := time.After(30 * time.Second)
-						ticker2 := time.Tick(500 * time.Millisecond)
-
-						for {
-
-							select {
-							// Got a timeout! fail with a timeout error
-
-							case <-timeout2:
-								timeoutMessage := "Bummer, challenge period ended without a move from both participants 😞"
-								_, err := s.ChannelMessageSend(authorChannel.ID, timeoutMessage)
-								if err != nil {
-									fmt.Println(err)
-								}
-								_, err = s.ChannelMessageSend(targetChannel.ID, timeoutMessage)
-								if err != nil {
-									fmt.Println(err)
-								}
-								_, err = s.ChannelMessageSendReply(m.ChannelID, timeoutMessage, m.Reference())
-								if err != nil {
-									fmt.Println(err)
-								}
-
-								return
-							// Got a tick, we should check on reactions
-							case <-ticker2:
-								// Check reactions from the challenger
-								challengerRock, err2 := s.MessageReactions(authorChannel.ID, authorChannelMessage.ID, "⛰️", 100, "", "")
-								if err2 != nil {
-									fmt.Println(err)
-								}
-								challengerPaper, err2 := s.MessageReactions(authorChannel.ID, authorChannelMessage.ID, "🧻", 100, "", "")
-								if err2 != nil {
-									fmt.Println(err)
-								}
-								challengerScissors, err2 := s.MessageReactions(authorChannel.ID, authorChannelMessage.ID, "✂️", 100, "", "")
-								if err2 != nil {
-									fmt.Println(err)
-								}
-
-								// Check reactions from target
-								targetRock, err3 := s.MessageReactions(targetChannel.ID, targetChannelMessage.ID, "⛰️", 100, "", "")
-								if err2 != nil {
-									fmt.Println(err3)
-								}
-								targetPaper, err4 := s.MessageReactions(targetChannel.ID, targetChannelMessage.ID, "🧻", 100, "", "")
-								if err2 != nil {
-									fmt.Println(err4)
-								}
-								targetScissors, err5 := s.MessageReactions(targetChannel.ID, targetChannelMessage.ID, "✂️", 100, "", "")
-								if err2 != nil {
-									fmt.Println(err5)
-								}
-
-								// Moves to be assigned based on the compare statements
-								var challengerMove string
-								var targetMove string
-
-								// Check if reactions have adde value.
-								if (len(challengerRock) > 1 || len(challengerPaper) > 1 || len(challengerScissors) > 1) && (len(targetRock) > 1 || len(targetPaper) > 1 || len(targetScissors) > 1) {
-									if len(challengerRock) > 1 {
-										if challengerRock[0].ID == authorID {
-											challengerMove = "Rock"
-										}
-									}
-									if len(challengerPaper) > 1 {
-										if challengerPaper[0].ID == authorID {
-											challengerMove = "Paper"
-										}
-									}
-									if len(challengerScissors) > 1 {
-										if challengerScissors[0].ID == authorID {
-											challengerMove = "Scissors"
-										}
-									}
-									if len(targetRock) > 1 {
-										if targetRock[0].ID == trimmedUser {
-											targetMove = "Rock"
-										}
-									}
-									if len(targetPaper) > 1 {
-										if targetPaper[0].ID == trimmedUser {
-											targetMove = "Paper"
-										}
-									}
-									if len(targetScissors) > 1 {
-										if targetScissors[0].ID == trimmedUser {
-											targetMove = "Scissors"
-										}
-									}
-								}
-
-								if challengerMove != "" && targetMove != "" {
-									checkMovesAndNotify(s, m, challengerMove, targetMove, author, trimmed, targetNickname)
-									return
-								}
-							}
-						}
-
-					}
-				}
-				// checkSomething() isn't done yet, but it didn't fail either, let's try again
+		if !result {
+			authorAt := "<@!" + authorID + ">"
+			timeoutMessage := "Bummer, " + authorAt + ". Challenge period ended without a reaction from " + targetUserNickname + " 😞"
+			_, err := s.ChannelMessageSendReply(m.ChannelID, timeoutMessage, m.Reference())
+			if err != nil {
+				fmt.Println(err)
 			}
 		}
+
 	}
 
 }
 
-func checkMovesAndNotify(s *discordgo.Session, m *discordgo.MessageCreate, challengerMove string, targetMove string, author string, trimmed string, targetNickname string) {
+func checkReactions(s *discordgo.Session, m *discordgo.MessageCreate, challengeMessageID string, targetUserID string, author string, authorID string, targetUserNickname string) bool {
+	ticker := time.NewTicker(200 * time.Millisecond)
+	done := make(chan bool)
+
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case t := <-ticker.C:
+				reactions, err := s.MessageReactions(m.ChannelID, challengeMessageID, "✔️", 100, "", "")
+				if err != nil {
+					fmt.Println(err)
+				}
+
+				for _, user := range reactions {
+					if user.ID == targetUserID {
+						fmt.Println("Target User reacted! Yay")
+						sendChallengeDMs(s, m, author, authorID, targetUserID, targetUserNickname)
+						done <- true
+						return
+					}
+				}
+
+				fmt.Println("Tick at", t)
+			}
+		}
+	}()
+
+	time.Sleep(30 * time.Second)
+	ticker.Stop()
+	done <- true
+
+	// Call challenge expiration message fun
+	fmt.Println("Ticker stopped")
+
+	return false
+}
+
+func sendChallengeDMs(s *discordgo.Session, m *discordgo.MessageCreate, author string, authorID string, targetUserID string, targetUserNickname string) {
+	// Create DM to author with reaction options
+	authorChannel, errAuthorChannel := s.UserChannelCreate(authorID)
+	if errAuthorChannel != nil {
+		fmt.Println(errAuthorChannel)
+	}
+
+	// Send request move message to author
+	challengerMessage := "Time to clutch " + author + ". Select your move below."
+	authorChannelMessage, errAuthorChannelMessage := s.ChannelMessageSend(authorChannel.ID, challengerMessage)
+	if errAuthorChannelMessage != nil {
+		fmt.Println(errAuthorChannelMessage)
+	}
+
+	// Add reactions to Author's DM challenge message
+	AddMessageReactions(s, m, authorChannel.ID, authorChannelMessage.ID)
+
+	// Create DM to target with reaction options
+	targetChannel, errTargetChannel := s.UserChannelCreate(targetUserID)
+	if errTargetChannel != nil {
+		fmt.Println(errTargetChannel)
+	}
+
+	// Send request move message to author
+	targetMessage := "Time to clutch " + targetUserNickname + ". Select your move below."
+	targetChannelMessage, errTargetChannelMessage := s.ChannelMessageSend(targetChannel.ID, targetMessage)
+	if errTargetChannelMessage != nil {
+		fmt.Println(errTargetChannelMessage)
+	}
+
+	// Add reactions to Target's DM challenge message
+	AddMessageReactions(s, m, targetChannel.ID, targetChannelMessage.ID)
+
+	// Make a channel to recieve a value from the
+	// checkMoves func for both author and target moves
+	c := make(chan string)
+
+	// Check the moves from both author and target.
+	go checkMoves(s, m, targetChannel.ID, targetChannelMessage.ID, c)
+	go checkMoves(s, m, authorChannel.ID, authorChannelMessage.ID, c)
+
+	// Recieve values from channel sent from checkMoves calls
+	moveTarget, moveAuthor := <-c, <-c
+
+	// Build the "@" value for author and target.
+	authorAt := "<@!" + authorID + ">"
+	targetAt := "<@!" + targetUserID + ">"
+
+	// Check to if author and/or target did not respond to send message.
+	if moveTarget == "" && moveAuthor == "" {
+		timeoutMessage := "Bummer, challenge period ended without a move from both participants 😞"
+		_, err := s.ChannelMessageSendReply(m.ChannelID, timeoutMessage, m.Reference())
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+
+	if moveTarget != "" && moveAuthor == "" {
+		timeoutMessage := "Bummer, challenge period ended without a move from" + authorAt + " 😞"
+		_, err := s.ChannelMessageSendReply(m.ChannelID, timeoutMessage, m.Reference())
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+
+	if moveTarget == "" && moveAuthor != "" {
+		timeoutMessage := "Bummer, challenge period ended without a move from" + targetAt + " 😞"
+		_, err := s.ChannelMessageSendReply(m.ChannelID, timeoutMessage, m.Reference())
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+
+	if moveTarget != "" && moveAuthor != "" {
+		checkMovesAndNotify(s, m, moveAuthor, moveTarget, author, targetUserID, targetUserNickname)
+	}
+}
+
+func AddMessageReactions(s *discordgo.Session, m *discordgo.MessageCreate, recipientChannelID string, recipientChannelMessageID string) {
+	err := s.MessageReactionAdd(recipientChannelID, recipientChannelMessageID, "⛰️")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	// Add paper reaction to request message
+	err = s.MessageReactionAdd(recipientChannelID, recipientChannelMessageID, "🧻")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	// Add scissors reaction to request message
+	err = s.MessageReactionAdd(recipientChannelID, recipientChannelMessageID, "✂️")
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func checkMoves(s *discordgo.Session, m *discordgo.MessageCreate, challengeDMChannelID string, challengeDMMessageID string, c chan string) {
+	ticker := time.NewTicker(200 * time.Millisecond)
+	done := make(chan bool)
+
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case t := <-ticker.C:
+				reactionRock, err := s.MessageReactions(challengeDMChannelID, challengeDMMessageID, "⛰️", 2, "", "")
+				if err != nil {
+					fmt.Println(err)
+				}
+
+				if len(reactionRock) > 1 {
+					c <- "Rock"
+					done <- true
+					return
+				}
+
+				reactionPaper, err := s.MessageReactions(challengeDMChannelID, challengeDMMessageID, "🧻", 2, "", "")
+				if err != nil {
+					fmt.Println(err)
+				}
+
+				if len(reactionPaper) > 1 {
+					c <- "Paper"
+					done <- true
+					return
+				}
+
+				reactionScissors, err := s.MessageReactions(challengeDMChannelID, challengeDMMessageID, "✂️", 2, "", "")
+				if err != nil {
+					fmt.Println(err)
+				}
+
+				if len(reactionScissors) > 1 {
+					c <- "Scissors"
+					done <- true
+					return
+				}
+			}
+		}
+	}()
+
+	// Stuff related to waiting
+	time.Sleep(15 * time.Second)
+	ticker.Stop()
+	done <- true
+
+	// Send empty string through the channel
+	c <- ""
+}
+
+func checkMovesAndNotify(s *discordgo.Session, m *discordgo.MessageCreate, moveAuthor string, moveTarget string, author string, targetUserID string, targetNickname string) {
 	authorID := m.Author.ID
 	authorAt := "<@!" + authorID + ">"
+	targetAt := "<@!" + targetUserID + ">"
 
 	// Rock vs Rock
-	if challengerMove == "Rock" && targetMove == "Rock" {
+	if moveAuthor == "Rock" && moveTarget == "Rock" {
 		resultsTitle := author + " ⚔️ " + targetNickname + "\n \n"
-		resultsOverview := authorAt + ": Rock" + " 🤡" + "\n" + trimmed + ": Rock" + " 🤡" + "\n \n"
+		resultsOverview := authorAt + ": Rock" + " 🤡" + "\n" + targetAt + ": Rock" + " 🤡" + "\n \n"
 		resultsMessage := "Welp, this is akward... " + author + " and " + targetNickname + " actually tied."
 		resultsFull := resultsTitle + resultsOverview + resultsMessage
 		_, err := s.ChannelMessageSendReply(m.ChannelID, resultsFull, m.Reference())
@@ -416,9 +406,9 @@ func checkMovesAndNotify(s *discordgo.Session, m *discordgo.MessageCreate, chall
 	}
 
 	// Rock vs Paper
-	if challengerMove == "Rock" && targetMove == "Paper" {
+	if moveAuthor == "Rock" && moveTarget == "Paper" {
 		resultsTitle := author + " ⚔️ " + targetNickname + "\n \n"
-		resultsOverview := authorAt + ": Rock" + "\n" + trimmed + ": Paper" + " 👑" + "\n \n"
+		resultsOverview := authorAt + ": Rock" + "\n" + targetAt + ": Paper" + " 👑" + "\n \n"
 		resultsMessage := author + " got rekt by " + targetNickname + ". Imagine..."
 		resultsFull := resultsTitle + resultsOverview + resultsMessage
 		_, err := s.ChannelMessageSendReply(m.ChannelID, resultsFull, m.Reference())
@@ -428,9 +418,9 @@ func checkMovesAndNotify(s *discordgo.Session, m *discordgo.MessageCreate, chall
 	}
 
 	// Rock vs Scissors
-	if challengerMove == "Rock" && targetMove == "Scissors" {
+	if moveAuthor == "Rock" && moveTarget == "Scissors" {
 		resultsTitle := author + " ⚔️ " + targetNickname + "\n \n"
-		resultsOverview := authorAt + ": Rock" + " 👑" + "\n" + trimmed + ": Scissors" + "\n \n"
+		resultsOverview := authorAt + ": Rock" + " 👑" + "\n" + targetAt + ": Scissors" + "\n \n"
 		resultsMessage := author + " kinda clapped " + targetNickname + " ngl..."
 		resultsFull := resultsTitle + resultsOverview + resultsMessage
 		_, err := s.ChannelMessageSendReply(m.ChannelID, resultsFull, m.Reference())
@@ -440,9 +430,9 @@ func checkMovesAndNotify(s *discordgo.Session, m *discordgo.MessageCreate, chall
 	}
 
 	// Paper vs Paper
-	if challengerMove == "Paper" && targetMove == "Paper" {
+	if moveAuthor == "Paper" && moveTarget == "Paper" {
 		resultsTitle := author + " ⚔️ " + targetNickname + "\n \n"
-		resultsOverview := authorAt + ": Paper" + " 🤡" + "\n" + trimmed + ": Paper" + " 🤡" + "\n \n"
+		resultsOverview := authorAt + ": Paper" + " 🤡" + "\n" + targetAt + ": Paper" + " 🤡" + "\n \n"
 		resultsMessage := "Welp, this is akward... " + author + " and " + targetNickname + " actually tied."
 		resultsFull := resultsTitle + resultsOverview + resultsMessage
 		_, err := s.ChannelMessageSendReply(m.ChannelID, resultsFull, m.Reference())
@@ -452,9 +442,9 @@ func checkMovesAndNotify(s *discordgo.Session, m *discordgo.MessageCreate, chall
 	}
 
 	// Paper vs Rock
-	if challengerMove == "Paper" && targetMove == "Rock" {
+	if moveAuthor == "Paper" && moveTarget == "Rock" {
 		resultsTitle := author + " ⚔️ " + targetNickname + "\n \n"
-		resultsOverview := authorAt + ": Paper" + " 👑" + "\n" + trimmed + ": Rock" + "\n \n"
+		resultsOverview := authorAt + ": Paper" + " 👑" + "\n" + targetAt + ": Rock" + "\n \n"
 		resultsMessage := author + " kinda clapped " + targetNickname + " ngl..."
 		resultsFull := resultsTitle + resultsOverview + resultsMessage
 		_, err := s.ChannelMessageSendReply(m.ChannelID, resultsFull, m.Reference())
@@ -464,9 +454,9 @@ func checkMovesAndNotify(s *discordgo.Session, m *discordgo.MessageCreate, chall
 	}
 
 	// Paper vs Scissors
-	if challengerMove == "Paper" && targetMove == "Scissors" {
+	if moveAuthor == "Paper" && moveTarget == "Scissors" {
 		resultsTitle := author + " ⚔️ " + targetNickname + "\n \n"
-		resultsOverview := authorAt + ": Paper" + "\n" + trimmed + ": Scissors" + " 👑" + "\n \n"
+		resultsOverview := authorAt + ": Paper" + "\n" + targetAt + ": Scissors" + " 👑" + "\n \n"
 		resultsMessage := author + " got rekt by " + targetNickname + ". Imagine..."
 		resultsFull := resultsTitle + resultsOverview + resultsMessage
 		_, err := s.ChannelMessageSendReply(m.ChannelID, resultsFull, m.Reference())
@@ -476,9 +466,9 @@ func checkMovesAndNotify(s *discordgo.Session, m *discordgo.MessageCreate, chall
 	}
 
 	// Scissors vs Scissors
-	if challengerMove == "Scissors" && targetMove == "Scissors" {
+	if moveAuthor == "Scissors" && moveTarget == "Scissors" {
 		resultsTitle := author + " ⚔️ " + targetNickname + "\n \n"
-		resultsOverview := authorAt + ": Scissors" + " 🤡" + "\n" + trimmed + ": Scissors" + " 🤡" + "\n \n"
+		resultsOverview := authorAt + ": Scissors" + " 🤡" + "\n" + targetAt + ": Scissors" + " 🤡" + "\n \n"
 		resultsMessage := "Welp, this is akward... " + author + " and " + targetNickname + " actually tied."
 		resultsFull := resultsTitle + resultsOverview + resultsMessage
 		_, err := s.ChannelMessageSendReply(m.ChannelID, resultsFull, m.Reference())
@@ -488,9 +478,9 @@ func checkMovesAndNotify(s *discordgo.Session, m *discordgo.MessageCreate, chall
 	}
 
 	// Scissors vs Rock
-	if challengerMove == "Scissors" && targetMove == "Rock" {
+	if moveAuthor == "Scissors" && moveTarget == "Rock" {
 		resultsTitle := author + " ⚔️ " + targetNickname + "\n \n"
-		resultsOverview := authorAt + ": Scissors" + "\n" + trimmed + ": Rock" + " 👑" + "\n \n"
+		resultsOverview := authorAt + ": Scissors" + "\n" + targetAt + ": Rock" + " 👑" + "\n \n"
 		resultsMessage := author + " got rekt by " + targetNickname + ". Imagine..."
 		resultsFull := resultsTitle + resultsOverview + resultsMessage
 		_, err := s.ChannelMessageSendReply(m.ChannelID, resultsFull, m.Reference())
@@ -500,10 +490,10 @@ func checkMovesAndNotify(s *discordgo.Session, m *discordgo.MessageCreate, chall
 	}
 
 	// Scissors vs Paper
-	if challengerMove == "Scissors" && targetMove == "Paper" {
+	if moveAuthor == "Scissors" && moveTarget == "Paper" {
 		resultsTitle := author + " ⚔️ " + targetNickname + "\n \n"
-		resultsOverview := authorAt + ": Scissors" + " 👑" + "\n" + trimmed + ": Paper" + "\n \n"
-		resultsMessage := author + " kinda clapped " + trimmed + " ngl..."
+		resultsOverview := authorAt + ": Scissors" + " 👑" + "\n" + targetAt + ": Paper" + "\n \n"
+		resultsMessage := author + " kinda clapped " + targetNickname + " ngl..."
 		resultsFull := resultsTitle + resultsOverview + resultsMessage
 		_, err := s.ChannelMessageSendReply(m.ChannelID, resultsFull, m.Reference())
 		if err != nil {
