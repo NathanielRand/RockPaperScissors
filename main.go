@@ -198,7 +198,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 func checkReactions(s *discordgo.Session, m *discordgo.MessageCreate, challengeMessageID string, targetUserID string, author string, authorID string, targetUserNickname string) bool {
-	ticker := time.NewTicker(200 * time.Millisecond)
+	ticker := time.NewTicker(1 * time.Second)
 	done := make(chan bool)
 
 	go func() {
@@ -335,7 +335,7 @@ func AddMessageReactions(s *discordgo.Session, m *discordgo.MessageCreate, recip
 }
 
 func checkMoves(s *discordgo.Session, m *discordgo.MessageCreate, challengeDMChannelID string, challengeDMMessageID string, c chan string) {
-	ticker := time.NewTicker(200 * time.Millisecond)
+	ticker := time.NewTicker(1 * time.Second)
 	done := make(chan bool)
 
 	go func() {
