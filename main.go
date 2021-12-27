@@ -271,14 +271,15 @@ func sendChallengeDMs(s *discordgo.Session, m *discordgo.MessageCreate, author s
 
 	// Make a channel to recieve a value from the
 	// checkMoves func for both author and target moves
-	c := make(chan string)
+	channelTarget := make(chan string)
+	channelAuthor := make(chan string)
 
 	// Check the moves from both author and target.
-	go checkMoves(s, m, targetChannel.ID, targetChannelMessage.ID, c)
-	go checkMoves(s, m, authorChannel.ID, authorChannelMessage.ID, c)
+	go checkMoves(s, m, targetChannel.ID, targetChannelMessage.ID, channelTarget)
+	go checkMoves(s, m, authorChannel.ID, authorChannelMessage.ID, channelAuthor)
 
 	// Recieve values from channel sent from checkMoves calls
-	moveTarget, moveAuthor := <-c, <-c
+	moveTarget, moveAuthor := <-channelTarget, <-channelAuthor
 
 	// Build the "@" value for author and target.
 	authorAt := "<@!" + authorID + ">"
