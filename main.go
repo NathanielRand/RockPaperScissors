@@ -375,6 +375,8 @@ func checkMoves(s *discordgo.Session, m *discordgo.MessageCreate, challengeDMCha
 					done <- true
 					return
 				}
+
+				fmt.Println("Tick: ", t)
 			}
 		}
 	}()
