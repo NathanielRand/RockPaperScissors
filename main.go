@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
+
 	// "math/rand"
 	"os"
 	"os/signal"
@@ -59,7 +61,7 @@ func main() {
 	<-sc
 
 	// Cleanly close down the Discord session.
-	dg.Close()
+	// dg.Close()
 }
 
 // This function will be called (due to AddHandler above) every time a new
@@ -86,7 +88,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		commandHelpTitle := "Looks like you need a hand. Check out my goodies below... \n \n"
 
 		// Notes
-		note0 := "- Commands are case-sensitive. They must be in lower-case :) . \n"
+		// note0 := "- Commands are case-sensitive. They must be in lower-case :) . \n"
 		note1 := "- Dev: Narsiq#5638. DM me for requests/questions/love. \n"
 
 		// Commands
@@ -97,7 +99,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		commandVersion := "🤖  !rpsversion : Current RPS version. \n"
 
 		// Build help message
-		message := "Whats up " + author + "\n \n" + commandHelpTitle + "NOTES: \n \n" + note0 + note1 + "\n" + "COMMANDS: \n \n" + commandHelp + commandChallenge + "\n" + "OTHER: \n \n" + commandSite + commandSupport + commandVersion + "\n \n" + "https://www.patreon.com/BotVoteTo"
+		message := "Whats up " + author + "\n \n" + commandHelpTitle + "NOTES: \n \n" + note1 + "\n" + "COMMANDS: \n \n" + commandHelp + commandChallenge + "\n" + "OTHER: \n \n" + commandSite + commandSupport + commandVersion + "\n \n" + "https://www.patreon.com/BotVoteTo"
 
 		// Reply to help request with build message above.
 		_, err := s.ChannelMessageSendReply(m.ChannelID, message, m.Reference())
@@ -119,7 +121,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	if strings.Contains(content, "!rpssupport") {
 		// Create support message
-		message := "Thanks for thinking of me " + author + " 💖." + "\n" + "https://www.patreon.com/BotVoteTo"
+		message := "Thanks for thinking of me " + author + " 💖." + "\n" + "https://www.patreon.com/discordbotsdev"
 
 		// Send start vote message
 		_, err := s.ChannelMessageSend(m.ChannelID, message)
@@ -130,10 +132,29 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	if strings.Contains(content, "!rpsversion") {
 		// Create version message
-		message := "VoteBot is currently running version " + version
+		message := "RockPaperScissors is currently running version " + version
 
 		// Send start vote message
 		_, err := s.ChannelMessageSend(m.ChannelID, message)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+
+	if strings.Contains(content, "!rpsstats") {
+		// TODO: This will need to be updated to iterate through
+		// all shards once the bot joins 1,000 servers.
+		guilds := s.State.Ready.Guilds
+		fmt.Println(len(guilds))
+		guildCount := len(guilds)
+
+		guildCountStr := strconv.Itoa(guildCount)
+
+		// // Build start vote message
+		message := "RockPaperScissors is currently on " + guildCountStr + " servers. Such wow!"
+
+		// Send start vote message
+		_, err := s.ChannelMessageSendReply(m.ChannelID, message, m.Reference())
 		if err != nil {
 			fmt.Println(err)
 		}
