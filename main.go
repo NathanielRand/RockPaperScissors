@@ -16,7 +16,8 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var version string = "2.1.0"
+const version string = "2.1.0"
+const prefix string = "!rps"
 
 func goDotEnvVariable(key string) string {
 	// Load .env file.
@@ -82,7 +83,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Grab message content from guild.
 	content := m.Content
 
-	if strings.Contains(content, "!rpshelp") {
+	if strings.Contains(content, prefix+"help") {
 
 		// Title
 		commandHelpTitle := "Looks like you need a hand. Check out my goodies below... \n \n"
@@ -108,7 +109,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
-	if strings.Contains(content, "!rpssite") {
+	if strings.Contains(content, prefix+"site") {
 		// Create website message
 		message := "Here ya go " + author + "..." + "\n" + "https://discordbots.dev/"
 
@@ -119,7 +120,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
-	if strings.Contains(content, "!rpssupport") {
+	if strings.Contains(content, prefix+"support") {
 		// Create support message
 		message := "Thanks for thinking of me " + author + " 💖." + "\n" + "https://www.patreon.com/discordbotsdev"
 
@@ -130,7 +131,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
-	if strings.Contains(content, "!rpsversion") {
+	if strings.Contains(content, prefix+"version") {
 		// Create version message
 		message := "RockPaperScissors is currently running version " + version
 
@@ -141,7 +142,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
-	if strings.Contains(content, "!rpsstats") {
+	if strings.Contains(content, prefix+"stats") {
 		// TODO: This will need to be updated to iterate through
 		// all shards once the bot joins 1,000 servers.
 		guilds := s.State.Ready.Guilds
@@ -160,7 +161,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
-	if strings.Contains(content, "!rps") {
+	if strings.Contains(content, prefix+" ") {
 		// Trim bot command from string to grab User tagged
 		trimCommand := strings.TrimPrefix(content, "!rps ")
 		targetUserID := strings.Trim(trimCommand, "<@!>")
