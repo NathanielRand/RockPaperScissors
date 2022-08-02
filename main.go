@@ -16,7 +16,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var version string = "2.0.0"
+var version string = "2.1.0"
 
 func goDotEnvVariable(key string) string {
 	// Load .env file.
